@@ -1,0 +1,11 @@
+.venv/
+*.env
+.job-agent.env
+jobs.db
+__pycache__/
+*.pyc
+job_results_*.xlsx
+.DS_Store
+
+apikeys
+~$*.xlsx
