@@ -100,7 +100,23 @@ export default async function handler(req: Request): Promise<Response> {
         elem
       FROM jsonb_array_elements(CAST(${JSON.stringify(records)} AS jsonb)) AS elem
       ON CONFLICT (source_key, source_job_id) DO UPDATE
-        SET last_seen_at = now()
+        SET
+          fingerprint         = EXCLUDED.fingerprint,
+          title               = COALESCE(NULLIF(EXCLUDED.title, ''),             postings.title),
+          employer            = COALESCE(NULLIF(EXCLUDED.employer, ''),          postings.employer),
+          location            = COALESCE(NULLIF(EXCLUDED.location, ''),          postings.location),
+          country             = COALESCE(EXCLUDED.country,                       postings.country),
+          url                 = COALESCE(NULLIF(EXCLUDED.url, ''),               postings.url),
+          description_text    = COALESCE(NULLIF(EXCLUDED.description_text, ''), postings.description_text),
+          description_is_full = postings.description_is_full OR EXCLUDED.description_is_full,
+          posted_at           = COALESCE(EXCLUDED.posted_at,                     postings.posted_at),
+          closes_at           = COALESCE(EXCLUDED.closes_at,                     postings.closes_at),
+          salary_min          = COALESCE(EXCLUDED.salary_min,                    postings.salary_min),
+          salary_max          = COALESCE(EXCLUDED.salary_max,                    postings.salary_max),
+          salary_period       = COALESCE(EXCLUDED.salary_period,                 postings.salary_period),
+          employer_industry   = COALESCE(EXCLUDED.employer_industry,             postings.employer_industry),
+          raw_json            = EXCLUDED.raw_json,
+          last_seen_at        = now()
     `;
 
     return Response.json({ upserted: records.length });
