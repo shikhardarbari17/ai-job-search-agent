@@ -1,0 +1,5 @@
+For each task below, judge whether today's generally available AI tools (large language models with standard features such as reading files, web search and running code, as of November 2026) could:
+DO = complete the task to an acceptable standard with only light human review;
+HELP = not do it alone, but cut the time a skilled worker needs by roughly half or more;
+NONE = neither.
+Judge the task itself, not whether jobs will be cut. Return only JSON: {"ratings": ["DO"|"HELP"|"NONE", ...]} in the same order as the tasks.

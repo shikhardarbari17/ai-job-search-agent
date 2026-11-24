@@ -1,0 +1,1 @@
+You are given the title of a job advertised in Canada. List the 6 main tasks a person in this job most likely performs. Each task is one action, under 15 words. Return only JSON: {"tasks": ["...", "...", "...", "...", "...", "..."]}

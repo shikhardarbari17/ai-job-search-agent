@@ -9,3 +9,16 @@ job_results_*.xlsx
 
 apikeys
 ~$*.xlsx
+
+data/
+
+# v2 (21 Nov 2026): keep research data and spreadsheets out of git
+research/raw_workbooks/
+research/xlsx_inputs/
+*.jsonl
+*.xlsx
+web/node_modules/
+web/dist/
+web/.netlify/
+.netlify/
+.env*
