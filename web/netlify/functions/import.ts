@@ -1,0 +1,116 @@
+import type { Config } from "@netlify/functions";
+import { getDb } from "./_lib/db.js";
+import { guardPasscode } from "./_lib/guard.js";
+
+interface PostingRecord {
+  sourceJobId: string;
+  title: string;
+  employer?: string;
+  location?: string;
+  country?: string | null;
+  url?: string;
+  descriptionText?: string;
+  descriptionIsFull?: boolean;
+  postedAt?: string | null;
+  closesAt?: string | null;
+  salaryMin?: number | null;
+  salaryMax?: number | null;
+  salaryPeriod?: string | null;
+  employerIndustry?: string | null;
+  raw?: unknown;
+}
+
+interface ImportBody {
+  sourceKey: string;
+  records: PostingRecord[];
+}
+
+const VALID_SOURCES = ["research_import", "workday_import"] as const;
+type ValidSource = (typeof VALID_SOURCES)[number];
+
+function json400(msg: string) {
+  return new Response(JSON.stringify({ error: msg }), {
+    status: 400,
+    headers: { "Content-Type": "application/json" },
+  });
+}
+
+export default async function handler(req: Request): Promise<Response> {
+  const deny = guardPasscode(req);
+  if (deny) return deny;
+
+  if (req.method !== "POST") {
+    return new Response(JSON.stringify({ error: "POST only" }), {
+      status: 405,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
+  let body: ImportBody;
+  try {
+    body = (await req.json()) as ImportBody;
+  } catch {
+    return json400("Invalid JSON body");
+  }
+
+  const { sourceKey, records } = body;
+
+  if (!VALID_SOURCES.includes(sourceKey as ValidSource)) {
+    return json400(`sourceKey must be one of: ${VALID_SOURCES.join(", ")}`);
+  }
+  if (!Array.isArray(records) || records.length === 0 || records.length > 200) {
+    return json400("records must be an array of 1–200 items");
+  }
+
+  const db = getDb();
+
+  try {
+    await db.sql`
+      INSERT INTO postings (
+        source_key, source_job_id, fingerprint,
+        title, employer, location, country, url,
+        description_text, description_is_full,
+        posted_at, closes_at,
+        salary_min, salary_max, salary_period,
+        employer_industry, raw_json
+      )
+      SELECT
+        ${sourceKey},
+        COALESCE(NULLIF(elem->>'sourceJobId', ''), elem->>'url'),
+        lower(COALESCE(elem->>'employer', '')) || '|' ||
+          lower(COALESCE(elem->>'title', '')) || '|' ||
+          lower(trim(split_part(COALESCE(elem->>'location', ''), ',', 1))),
+        COALESCE(elem->>'title', ''),
+        COALESCE(elem->>'employer', ''),
+        COALESCE(elem->>'location', ''),
+        NULLIF(elem->>'country', ''),
+        COALESCE(elem->>'url', ''),
+        COALESCE(elem->>'descriptionText', ''),
+        COALESCE((elem->>'descriptionIsFull')::boolean, false),
+        CASE WHEN elem->>'postedAt' IS NOT NULL AND elem->>'postedAt' != ''
+             THEN (elem->>'postedAt')::date END,
+        CASE WHEN elem->>'closesAt' IS NOT NULL AND elem->>'closesAt' != ''
+             THEN (elem->>'closesAt')::date END,
+        CASE WHEN elem->>'salaryMin' IS NOT NULL AND elem->>'salaryMin' != ''
+             THEN (elem->>'salaryMin')::numeric END,
+        CASE WHEN elem->>'salaryMax' IS NOT NULL AND elem->>'salaryMax' != ''
+             THEN (elem->>'salaryMax')::numeric END,
+        NULLIF(elem->>'salaryPeriod', ''),
+        NULLIF(elem->>'employerIndustry', ''),
+        elem
+      FROM jsonb_array_elements(CAST(${JSON.stringify(records)} AS jsonb)) AS elem
+      ON CONFLICT (source_key, source_job_id) DO UPDATE
+        SET last_seen_at = now()
+    `;
+
+    return Response.json({ upserted: records.length });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return new Response(JSON.stringify({ error: message }), {
+      status: 500,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+}
+
+export const config: Config = { path: "/api/import" };
