@@ -56,13 +56,17 @@ function mapWorkdayPosting(
     url: String(r.url ?? ""),
     descriptionText: stripHtml(String(r.description_html ?? "")),
     descriptionIsFull: true,
-    postedAt: r.posted_on ? String(r.posted_on) : null,
+    postedAt: isoDate(r.start_date),
     employerIndustry: industryMap[employer.toLowerCase()] ?? null,
     raw: r,
   };
 }
 
 // ── utilities ────────────────────────────────────────────────────────────────
+
+function isoDate(v: unknown): string | null {
+  return typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : null;
+}
 
 function stripHtml(html: string): string {
   if (!html) return "";

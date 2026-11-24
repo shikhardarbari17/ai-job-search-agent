@@ -87,13 +87,13 @@ export default async function handler(req: Request): Promise<Response> {
         COALESCE(elem->>'url', ''),
         COALESCE(elem->>'descriptionText', ''),
         COALESCE((elem->>'descriptionIsFull')::boolean, false),
-        CASE WHEN elem->>'postedAt' IS NOT NULL AND elem->>'postedAt' != ''
-             THEN (elem->>'postedAt')::date END,
-        CASE WHEN elem->>'closesAt' IS NOT NULL AND elem->>'closesAt' != ''
-             THEN (elem->>'closesAt')::date END,
-        CASE WHEN elem->>'salaryMin' IS NOT NULL AND elem->>'salaryMin' != ''
+        CASE WHEN elem->>'postedAt' ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}'
+             THEN LEFT(elem->>'postedAt', 10)::date END,
+        CASE WHEN elem->>'closesAt' ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}'
+             THEN LEFT(elem->>'closesAt', 10)::date END,
+        CASE WHEN elem->>'salaryMin' ~ '^[0-9]+([.][0-9]+)?$'
              THEN (elem->>'salaryMin')::numeric END,
-        CASE WHEN elem->>'salaryMax' IS NOT NULL AND elem->>'salaryMax' != ''
+        CASE WHEN elem->>'salaryMax' ~ '^[0-9]+([.][0-9]+)?$'
              THEN (elem->>'salaryMax')::numeric END,
         NULLIF(elem->>'salaryPeriod', ''),
         NULLIF(elem->>'employerIndustry', ''),
@@ -121,7 +121,8 @@ export default async function handler(req: Request): Promise<Response> {
 
     return Response.json({ upserted: records.length });
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
+    const cause = err instanceof Error ? err.cause : undefined;
+    const message = (cause instanceof Error ? cause.message : err instanceof Error ? err.message : String(err)).slice(0, 300);
     return new Response(JSON.stringify({ error: message }), {
       status: 500,
       headers: { "Content-Type": "application/json" },
